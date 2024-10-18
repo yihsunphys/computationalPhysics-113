@@ -47,12 +47,29 @@ def solve_ivp(func, t_span, y0, method, t_eval, args):
           t_span and t_eval. Be careful. 
 
     """
-
+    time = t_span[0]
+    y    = y0
     sol  = np.zeros((len(y0),len(t_eval))) # define the shape of the solution
 
     #
     # TODO:
     #
+    # set the numerical solver based on "method"
+    if method=="Euler":
+        _update = _update_euler
+    elif method=="RK2":
+        _update = _update_rk2
+    elif method=="RK4":
+        _update = _update_rk4
+    elif method == "Leapfrog":
+        _update = _update_leapfrog
+
+
+    for n,t in enumerate(t_eval):
+        dt = t-time # current time - pre time 
+        y = _update(func, y, dt ,t, *args)
+        sol[:,n] = y # sol[0] = x, sol[1] = v
+        time = t
 
     return sol
 
@@ -70,17 +87,14 @@ def _update(derive_func,y0, dt, t, method, *args):
     :return: the next step condition y
 
     """
-
     if method=="Euler":
-        ynext = _update_euler(derive_func,y0,dt,t,*args)
+        return _update_euler(derive_func,y0,dt,t,*args)
     elif method=="RK2":
-        ynext = _update_rk2(derive_func,y0,dt,t,*args)
+        return _update_rk2(derive_func,y0,dt,t,*args)
     elif method=="RK4":
-        ynext = _update_rk4(derive_func,y0,dt,t,*args)
-    else:
-        print("Error: mysolve doesn't supput the method",method)
-        quit()
-    return ynext
+        return _update_rk4(derive_func,y0,dt,t,*args)
+    elif method=="RK4":
+        return _update_leapfrog(derive_func,y0,dt,t,*args)
 
 def _update_euler(derive_func,y0,dt,t,*args):
     """
@@ -89,12 +103,12 @@ def _update_euler(derive_func,y0,dt,t,*args):
     :return: the next step solution y
 
     """
-
     #
     # TODO:
     #
+    return y0 + derive_func(t, y0, *args) * dt
+    
 
-    return y0 # <- change here. just a placeholder
 
 def _update_rk2(derive_func,y0,dt,t,*args):
     """
@@ -106,21 +120,35 @@ def _update_rk2(derive_func,y0,dt,t,*args):
     #
     # TODO:
     #
-
-    return y0 # <- change here. just a placeholder
+    y1 = y0 + derive_func(t, y0, *args) * dt
+    y2 = y1 + derive_func(t, y1, *args) * dt
+    return 0.5*(y0 + y2)
 
 def _update_rk4(derive_func,y0,dt,t,*args):
     """
     Update the IVP with the RK4 method
-
-    :return: the next step solution y
     """
+    dt2 = 0.5*dt 
+    k1  = derive_func(t,y0,*args)
+    y1  = y0 + k1 * dt2
+    k2  = derive_func(t+dt2,y1,*args)
+    y2  = y0 + k2 * dt2
+    k3  = derive_func(t+dt2,y2,*args)
+    y3  = y0 + k3 * dt
+    k4  = derive_func(t+dt,y3,*args)
+    return y0 + dt*(k1+ 2*k2 + 2*k3 + k4)/6.0
 
-    #
-    # TODO:
-    #
+def _update_leapfrog(derive_func, y0, dt, t, *args):
+    yderv = derive_func(t, y0, *args)
+    # half-step kick,
+    v_half = y0[1] + (yderv[1] * dt / 2)
+    # full-step drift
+    x_next = y0[0] + v_half * dt
+    yderv_next = derive_func(t, [x_next, v_half], *args)
+    # half-step kick
+    v_next = v_half + (yderv_next[1] * dt / 2)
+    return np.array([x_next, v_next])
 
-    return y0 # <- change here. just a placeholder
 
 if __name__=='__main__':
 
@@ -134,7 +162,7 @@ if __name__=='__main__':
     """
 
 
-    def oscillator(t,y,K,M):
+    def oscillator(y,K,M):
         """
         The derivate function for an oscillator
         In this example, we set
@@ -155,18 +183,18 @@ if __name__=='__main__':
         #
         # TODO:
         #
- 
-        return y # <- change here. just a placeholder
+        f = np.zeros(len(y))
+        f[0] = y[1]           # y'[0] = v
+        f[1] = -K * y[0]/M        # y'[1] = a = F/M
+        return f
+
 
     t_span = (0, 10)
     y0     = np.array([1,0])
-    t_eval = np.linspace(0,1,100)
-
+    t_eval = np.linspace(0,1,1000)
     K = 1
     M = 1
 
-    sol = solve_ivp(oscillator, t_span, y0, 
-                    method="Euler",t_eval=t_eval, args=(K,M))
-
+    sol = solve_ivp(oscillator, t_span, y0, method="Euler",t_eval=t_eval, args=(K,M))
     print("sol=",sol[0])
     print("Done!")

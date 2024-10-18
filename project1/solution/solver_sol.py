@@ -142,8 +142,8 @@ if __name__=='__main__':
         A = force/M        # the accerlation
 
         f = np.zeros(len(y)) # y' has the same dimension of y
-        f[0] = y[1]
-        f[1] = A
+        f[0] = y[1] # v
+        f[1] = A # a
         return f
 
     t_span = (0, 10)
@@ -158,3 +158,60 @@ if __name__=='__main__':
 
     print("sol=",sol[0])
     print("Done!")
+
+    import numpy as np
+import matplotlib.pyplot as plt
+
+def true_solution(t, A, omega):
+    """
+    解析解 x(t) = A * cos(omega * t)
+    """
+    return A * np.cos(omega * t)
+
+def calculate_error(numerical_sol, t_eval, A, omega):
+    """
+    計算數值解與解析解的誤差
+    :param numerical_sol: array, 數值解
+    :param t_eval: array, 時間點
+    :param A: float, 振幅
+    :param omega: float, 角頻率
+    :return: float, 誤差的L2範數
+    """
+    true_sol = true_solution(t_eval, A, omega)
+    error = np.linalg.norm(numerical_sol[0] - true_sol)
+    return error
+
+def convergence_test():
+    # 問題設定
+    t_span = (0, 10)
+    y0 = np.array([1, 0])  # 初始條件：x(0) = 1, v(0) = 0
+    K = 1
+    M = 1
+    omega = np.sqrt(K / M)  # 簡諧振子的角頻率
+
+    methods = ["Euler", "RK2", "RK4"]
+    time_steps = [0.1, 0.01, 0.001]  # 不同的步長
+    errors = {method: [] for method in methods}
+
+    for dt in time_steps:
+        t_eval = np.arange(t_span[0], t_span[1], dt)
+        for method in methods:
+            sol = solve_ivp(oscillator, t_span, y0, method=method, t_eval=t_eval, args=(K, M))
+            error = calculate_error(sol, t_eval, 1, omega)
+            errors[method].append(error)
+
+    # 畫出誤差與時間步長的關係圖
+    plt.figure(figsize=(8, 6))
+    for method in methods:
+        plt.loglog(time_steps, errors[method], label=f'{method} method')
+    
+    plt.xlabel('Time step size (dt)')
+    plt.ylabel('Error (L2 norm)')
+    plt.title('Convergence Test: Error vs Time Step Size')
+    plt.legend()
+    plt.grid(True, which="both", ls="--")
+    plt.show()
+
+if __name__ == '__main__':
+    # 進行收斂性測試
+    convergence_test()
