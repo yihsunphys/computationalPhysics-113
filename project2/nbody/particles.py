@@ -95,6 +95,45 @@ class Particles:
         # Update the number of particles
         self.nparticles += num_new_particles
 
+    def output(self, filename):    
+        # Reshape masses to be a 2D array with shape (N, 1)
+        masses_reshaped = self._masses.reshape(-1, 1)
+    
+        # Concatenate the reshaped masses with positions, velocities, and accelerations
+        data = np.hstack((masses_reshaped, self._positions, self._velocities, self._accelerations))
+    
+        # Save the data to a text file with a header
+        np.savetxt(filename, data, 
+               header='mass x y z vx vy vz ax ay az', comments='# ')
+
+    def draw(self, dim):
+        if dim == 2:
+            plt.scatter(self._positions[:, 0], self._positions[:, 1])
+            plt.xlabel('x')
+            plt.ylabel('y')
+            plt.show()
+        elif dim == 3:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            ax.scatter(self._positions[:, 0], self._positions[:, 1], self._positions[:, 2])
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_zlabel('z')
+            plt.show()
+        else:
+            raise ValueError("Invalid dimension. dim must be 2 or 3")
+
+
+if __name__ == "__main__":
+    # Create a Particles instance
+    num_particles = 100
+    particles = Particles(num_particles)
+
+    # Uncomment each line to test and ensure it raises an error
+    particles.masses = np.ones(num_particles)  # This line will work fine
+    particles.positions = np.random.rand(199, 3)  # This line will raise an error
+    particles.velocities = np.random.rand(500, 3)  # This line will raise an error
+
 
 # Create a Particles instance
 # num_particles = 100
