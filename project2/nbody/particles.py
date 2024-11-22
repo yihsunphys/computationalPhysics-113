@@ -20,7 +20,7 @@ class Particles:
     @masses.setter
     def masses(self, value):
         # Check if the shape of masses array is correct
-        if value.shape != (self.nparticles,):
+        if value.shape != np.ones((self.nparticles,1)).shape:
             raise ValueError(f"Masses should be a 1D array of length {self.nparticles}")
         self._masses = value
 
@@ -68,47 +68,44 @@ class Particles:
             raise ValueError(f"Tags should be a 1D array of length {self.nparticles}")
         self._tags = value
 
-    def add_particles(self, masses, positions, velocities, accelerations):
-        # Validate shapes of the input arrays
-        if masses.shape != (masses.shape[0], 1):
-            raise ValueError(f"Masses should be a 2D array with shape (num_particles, 1)")
-        if positions.shape != (positions.shape[0], 3):
-            raise ValueError(f"Positions should be a 2D array with shape (num_particles, 3)")
-        if velocities.shape != (velocities.shape[0], 3):
-            raise ValueError(f"Velocities should be a 2D array with shape (num_particles, 3)")
-        if accelerations.shape != (accelerations.shape[0], 3):
-            raise ValueError(f"Accelerations should be a 2D array with shape (num_particles, 3)")
+    def add_particles(self, mass, pos, vel, acc):
+        self.nparticles += mass.shape[0]
+        self.masses = np.vstack((self.masses, mass))
+        self.positions = np.vstack((self.positions, pos))
+        self.velocities = np.vstack((self.velocities, vel))
+        self.accelerations = np.vstack((self.accelerations, acc))
+        self.tags = np.arange(self.nparticles)
+        return
+    
+    def compute_kinetic_energy(self):
 
-        # Check if all arrays have the same number of particles
-        num_new_particles = masses.shape[0]
-        if not (positions.shape[0] == num_new_particles and
-                velocities.shape[0] == num_new_particles and
-                accelerations.shape[0] == num_new_particles):
-            raise ValueError("All input arrays must have the same number of particles")
+        # return 0.5 * np.sum(self._masses * np.linalg.norm(self._velocities, axis=1)**2)
+        return np.sum((self.velocities[:, 0] ** 2 + self.velocities[:, 1] ** 2 + self.velocities[:, 2] ** 2) \
+               * self.masses / 2)
+    def compute_potential_energy(self):
 
-        # Append the new particles' data to the existing data
-        self._masses = np.vstack((self._masses, masses))
-        self._positions = np.vstack((self._positions, positions))
-        self._velocities = np.vstack((self._velocities, velocities))
-        self._accelerations = np.vstack((self._accelerations, accelerations))
-
-        # Update the number of particles
-        self.nparticles += num_new_particles
+        potential_energy = 0
+        for i in range(self.nparticles):
+            for j in range(i + 1, self.nparticles):
+                r_ij = np.linalg.norm(self._positions[i] - self._positions[j])
+                potential_energy -= 10 * self._masses[i] * self._masses[j] / r_ij
+        return float(potential_energy)
 
     def output(self, filename):    
-        # Reshape masses to be a 2D array with shape (N, 1)
         masses_reshaped = self._masses.reshape(-1, 1)
-    
-        # Concatenate the reshaped masses with positions, velocities, and accelerations
         data = np.hstack((masses_reshaped, self._positions, self._velocities, self._accelerations))
-    
-        # Save the data to a text file with a header
-        np.savetxt(filename, data, 
-               header='mass x y z vx vy vz ax ay az', comments='# ')
+        kinetic_energy = self.compute_kinetic_energy()
+        potential_energy = self.compute_potential_energy()
+        total_energy = kinetic_energy + potential_energy
+        with open(filename, 'w') as f:
+            f.write(f'# Total Kinetic Energy: {kinetic_energy} J\n')
+            f.write(f'# Total Potential Energy: {potential_energy} J\n')
+            f.write(f'# Total Energy: {total_energy} J\n')
+            np.savetxt(f, data, header='mass x y z vx vy vz ax ay az', comments='# ')
 
     def draw(self, dim):
         if dim == 2:
-            plt.scatter(self._positions[:, 0], self._positions[:, 1])
+            plt.scatter(self._positions[:, 0], self._positions[:, 1], s=1, alpha = 0.5)
             plt.xlabel('x')
             plt.ylabel('y')
             plt.show()
@@ -121,7 +118,9 @@ class Particles:
             ax.set_zlabel('z')
             plt.show()
         else:
-            raise ValueError("Invalid dimension. dim must be 2 or 3")
+            raise ValueError("Invalid dimension.")
+        
+
 
 
 if __name__ == "__main__":

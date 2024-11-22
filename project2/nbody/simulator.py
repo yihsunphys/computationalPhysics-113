@@ -68,44 +68,60 @@ class NBodySimulator:
         """
 
         # TODO
+        folder = f"data_{self.io_header}" 
+        Path(folder).mkdir(parents=True, exist_ok=True)  
+        
+        method_map = {
+            "Euler": self._advance_particles_Euler,
+            "RK2": self._advance_particles_RK2,
+            "RK4": self._advance_particles_RK4
+        }
+        
+        advance_method = method_map.get(self.method)
+        if advance_method is None:
+            raise ValueError(f"Invalid integration method: {self.method}")
+
         t = 0
+        id = 0
         while t < tmax:
-            if self.method == "Euler":
-                self.particles = self._advance_particles_Euler(dt, self.particles)
-            elif self.method == "RK2":
-                self.particles = self._advance_particles_RK2(dt, self.particles)
-            elif self.method == "RK4":
-                self.particles = self._advance_particles_RK4(dt, self.particles)
+
+            self.particles = advance_method(dt, self.particles)
+            fn = f"{folder}/{self.io_header}_{id:06d}.dat"
+            self.particles.output(fn)
+            if id % self.io_freq == 0:
+                
+                if self.io_screen:
+                    print(f"Time: {t:.2f}/{tmax:.2f}")
+
+                if self.visualization:
+                    self.particles.draw(2)
+
             t += dt
-
-            if self.io_screen:
-                print(f"Time: {t}/{tmax}")
-
-            if self.io_freq > 0 and int(t / dt) % self.io_freq == 0:
-                self._output_snapshot(t)
-
+            id += 1
 
         print("Simulation is done!")
         return
+    
 
+
+    @jit(forceobj=True)
     def _calculate_acceleration(self, nparticles, masses, positions):
         """
         Calculate the acceleration of the particles
         """
-        accelerations = np.zeros_like(positions)
-        
 
         # TODO
-        accelerations = np.zeros_like(positions)
-        for i in range(nparticles):
-            for j in range(nparticles):
-                if i!=j:
-                    r = positions[j] - positions[i]
-                    distance = np.linalg.norm(r) + self.rsoft
-                    accelerations[i] += self.G * masses[j] * r / distance**3
+        G = self.G
+        rsoft = self.rsoft
+
+        # invoke the kernel for acceleration calculation
+        accelerations = _calculate_acceleration_kernel(nparticles, masses, positions, G, rsoft)
+
         return accelerations
 
-        
+    
+
+    @jit(forceobj=True)
     def _advance_particles_Euler(self, dt, particles):
 
         #TODO
@@ -114,7 +130,7 @@ class NBodySimulator:
         particles.velocities += dt * accelerations
         return particles
 
-
+    @jit(forceobj=True)
     def _advance_particles_RK2(self, dt, particles):
 
         # TODO
@@ -124,7 +140,7 @@ class NBodySimulator:
         particles.velocities += dt * accelerations_half
         return particles
 
-
+    @jit(forceobj=True)
     def _advance_particles_RK4(self, dt, particles):
         
         #TODO
@@ -144,7 +160,20 @@ class NBodySimulator:
         particles.velocities += (k1_v + 2*k2_v + 2*k3_v + k4_v) / 6
         return particles
 
+@njit(parallel=True)
+def _calculate_acceleration_kernel(nparticles, masses, positions, G, rsoft):
 
+    accelerations = np.zeros_like(positions)
+    for i in prange(nparticles):
+        for j in prange(nparticles):
+            if (j>i): 
+                rij = positions[i,:] - positions[j,:]
+                r = np.sqrt(np.sum(rij**2) + rsoft**2)
+                force = - G * masses[i,0] * masses[j,0] * rij / r**3
+                accelerations[i,:] += force[:] / masses[i,0]
+                accelerations[j,:] -= force[:] / masses[j,0]
+
+    return accelerations
 
 
 if __name__ == "__main__":
