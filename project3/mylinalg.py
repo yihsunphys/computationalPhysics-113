@@ -23,6 +23,10 @@ def solveLowerTriangular(L,b):
     x  = np.zeros(n)
 
     # TODO
+    for i in range(n):
+        if L[i, i] == 0:
+            raise ValueError("Matrix is singular") 
+        x[i] = (b[i] - np.dot(L[i, :i], x[:i])) / L[i, i]  
     
     return x
 
@@ -43,7 +47,13 @@ def solveUpperTriangular(U,b):
     x  = np.zeros(n)
  
     # TODO
-    
+    for i in range(n - 1, -1, -1):  # Start from the last row and move upward
+        if U[i, i] == 0:
+            raise ValueError("Matrix is singular")
+
+        # Calculate x[i] using known values
+        x[i] = (b[i] - np.dot(U[i, i + 1:], x[i + 1:])) / U[i, i]
+
     return x
 
 
@@ -64,7 +74,17 @@ def lu(A):
     U  = np.zeros((n,n))
 
     # TODO
-    
+
+    for i in range(n):
+        # Compute upper triangular matrix U
+        for j in range(i, n):
+            U[i, j] = A[i, j] - np.dot(L[i, :i], U[:i, j])
+
+        # Compute lower triangular matrix L
+        for j in range(i, n):
+            if U[i, i] == 0:
+                raise ValueError("Matrix is singular")
+            L[j, i] = (A[j, i] - np.dot(L[j, :i], U[:i, i])) / U[i, i]
     return L, U
 
 
@@ -84,6 +104,13 @@ def lu_solve(A,b):
     x = np.zeros(len(b))
 
     # TODO
+     # Perform LU decomposition
+    L, U = lu(A)
 
+    # Solve Ly = b for y using forward substitution
+    y = solveLowerTriangular(L, b)
+
+    # Solve Ux = y for x using back substitution
+    x = solveUpperTriangular(U, y)
 
     return x
